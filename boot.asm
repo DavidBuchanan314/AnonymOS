@@ -55,18 +55,31 @@ db_add:	DD	0x7E00
 d_lba:	DQ	1
 
 stage0:
+	cli
 	xor	ax, ax ; zero all the things!
 	mov	ds, ax
 	mov	es, ax
 	mov	fs, ax
 	mov	gs, ax
+	mov ah, 0x70
 	mov	ss, ax
+	mov sp, 0xffff ; set up a 64k stack from 0x7ffff down to 0x70000
+	sti
 	
 	mov si, DskAdrPkt
 	mov ah, 0x42
 	int 0x13 ; note that dl is already set to the drive number
 	
 	jmp stage1 ; TODO: check for disk read errors
+
+puts: ; string in si
+	mov	ah, 0x0e
+.loop	lodsb
+	or	al, al
+	jz	halt
+	int	0x10
+	jmp	.loop
+	ret
 
 	TIMES 510-($-$$) DB 0
 	DW 0xAA55		; boot signature
@@ -90,12 +103,7 @@ stage1:
 	out 0x64, al
 	
 	mov	si, msg
-	mov	ah, 0x0e
-.loop	lodsb
-	or	al, al
-	jz	halt
-	int	0x10
-	jmp	.loop
+	call	puts
 
 halt:	CLI
 	HLT
