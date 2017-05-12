@@ -85,6 +85,10 @@ stage0:
 
 stage1:
 	
+	; enable A20 via keyboard controller
+	mov al, 0xdd
+	out 0x64, al
+	
 	mov	si, msg
 	mov	ah, 0x0e
 .loop	lodsb

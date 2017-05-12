@@ -1,4 +1,9 @@
 all: boot.bin
+	echo "Copying rootfs files to disk image. Root will be required for loopback mount."
+	mkdir -p mnt
+	sudo mount boot.bin mnt/ -o umask=000
+	cp -r rootfs/* mnt/
+	sudo umount mnt/
 
 boot.bin: boot.asm
 	nasm -f bin -o boot.bin boot.asm
