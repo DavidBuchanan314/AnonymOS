@@ -49,10 +49,13 @@ ALIGN	4 ; needed for Disk Address Packet
 
 DskAdrPkt:
 	DB	0x10 ; packet length
-	DB	0
+	DB	0 ; reserved
 blkcnt:	DW	RESVD_SECTORS - 1 ; Read the rest of the reserved sectors
 db_add:	DD	0x7E00
 d_lba:	DQ	1
+
+drvnum:
+	DB	0
 
 stage0:
 	cli
@@ -61,25 +64,42 @@ stage0:
 	mov	es, ax
 	mov	fs, ax
 	mov	gs, ax
-	mov ah, 0x70
+	mov	ah, 0x70
 	mov	ss, ax
-	mov sp, 0xffff ; set up a 64k stack from 0x7ffff down to 0x70000
+	mov	sp, 0xffff ; set up a 64k stack from 0x7ffff down to 0x70000
 	sti
 	
-	mov si, DskAdrPkt
-	mov ah, 0x42
-	int 0x13 ; note that dl is already set to the drive number
+	mov	[drvnum], dl ; Back up the drive number
 	
-	jmp stage1 ; TODO: check for disk read errors
+	mov	si, .msg
+	call	puts
+	
+	mov	si, DskAdrPkt
+	mov	ah, 0x42
+	mov	dl, [drvnum]
+	int	0x13
+	
+	jnc	stage1
+	
+	mov	si, .error
+	call	puts
+	jmp	halt
+	
+.msg	DB `stage0 bootloader loaded.\r\n`, 0
+.error	DB `A disk read error occured.\r\n`, 0
 
 puts: ; string in si
 	mov	ah, 0x0e
 .loop	lodsb
 	or	al, al
-	jz	halt
+	jz	.done
 	int	0x10
 	jmp	.loop
-	ret
+.done	ret
+
+halt:
+	cli
+	hlt
 
 	TIMES 510-($-$$) DB 0
 	DW 0xAA55		; boot signature
@@ -98,22 +118,66 @@ puts: ; string in si
 
 stage1:
 	
-	; enable A20 via keyboard controller
-	mov al, 0xdd
-	out 0x64, al
-	
-	mov	si, msg
+	mov	si, .msg
 	call	puts
+	
+	; enable A20 via keyboard controller
+	mov	al, 0xdd
+	out	0x64, al
+	
+	mov	eax, RESVD_SECTORS + FAT_SECTORS
+	mov	[d_lba], eax
+	mov	eax, 0xc000
+	mov	[db_add], eax
+	mov	ax, 1
+	mov	[blkcnt], ax
+	
+	mov	si, DskAdrPkt
+	mov	ah, 0x42
+	mov	dl, [drvnum]
+	int	0x13
+	
+	call scandir
+	
+	jmp	halt
 
-halt:	CLI
-	HLT
+.msg:	DB `stage1 bootloader loaded.\r\n`, 0
 
-msg:	DB "stage1 bootloader has been loaded!", 0
+; scan a FAT32 cluster at 0xc000 for the kernel.
+; eax = kernel cluster on success
+; eax = 0 on failure
+scandir:
+	mov	bx, 0xc000
+.loop	mov	si, bx
+	mov	di, .fname
+	mov	cx, 11
+	repe cmpsb
+	je 	.success
+	add	bx, 32
+	cmp	bx, 0xe000
+	jl	.loop
+	xor	eax, eax
+	ret
+.success:
+	push	bx
+	mov	si, .msg
+	call	puts
+	pop	bx
+	mov	ax, [bx+20]
+	shl	eax, 16
+	mov	ax, [bx+26]
+	add	al, '0'
+	mov	ah, 0x0e
+	int	0x10
+	ret
+
+.msg:	DB `Found kernel directory entry.\r\n`, 0
+.fname:	DB "KERNEL  BIN"
 
 ; padding + FAT ;
 
 	TIMES RESVD_SECTORS*SECTOR_SIZE-($-$$) DB 0
-	DD 0x0ffffff0
+fat:	DD 0x0ffffff0
 	DD 0x0fffffff
 	DD 0x0fffffff
 
