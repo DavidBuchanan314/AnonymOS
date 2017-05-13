@@ -45,7 +45,7 @@
 
 ; stage0 bootloader code ;
 
-ALIGN	4 ; needed for Disk Address Packet
+	ALIGN	4 ; needed for Disk Address Packet
 
 DskAdrPkt:
 	DB	0x10 ; packet length
@@ -80,12 +80,15 @@ stage0:
 	int	0x13
 	
 	jnc	stage1
+	jmp	diskerr
 	
+.msg	DB `stage0 bootloader loaded.\r\n`, 0
+
+diskerr:
 	mov	si, .error
 	call	puts
 	jmp	halt
 	
-.msg	DB `stage0 bootloader loaded.\r\n`, 0
 .error	DB `A disk read error occured.\r\n`, 0
 
 puts: ; string in si
@@ -126,22 +129,29 @@ stage1:
 	out	0x64, al
 	
 	mov	eax, RESVD_SECTORS + FAT_SECTORS
-	mov	[d_lba], eax
-	mov	eax, 0xc000
-	mov	[db_add], eax
-	mov	ax, 1
-	mov	[blkcnt], ax
-	
-	mov	si, DskAdrPkt
-	mov	ah, 0x42
-	mov	dl, [drvnum]
-	int	0x13
+	call	loadsect
 	
 	call scandir
 	
 	jmp	halt
 
 .msg:	DB `stage1 bootloader loaded.\r\n`, 0
+
+loadsect: ; loads sector number eax at offset 0xc000
+	mov	[.lba], eax
+	mov	si, .pkt
+	mov	ah, 0x42
+	mov	dl, [drvnum]
+	int	0x13
+	jc	diskerr
+	ret
+	ALIGN	4 ; needed for following Disk Address Packet
+.pkt	DB	0x10
+	DB	0
+	DW	1
+	DD	0xc000
+.lba	DQ	0
+
 
 ; scan a FAT32 cluster at 0xc000 for the kernel.
 ; eax = kernel cluster on success
