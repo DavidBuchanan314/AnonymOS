@@ -50,12 +50,15 @@
 DskAdrPkt:
 	DB	0x10 ; packet length
 	DB	0 ; reserved
-blkcnt:	DW	RESVD_SECTORS - 1 ; Read the rest of the reserved sectors
-db_add:	DD	0x7E00
-d_lba:	DQ	1
+	DW	RESVD_SECTORS - 1 ; Read the rest of the reserved sectors
+	DD	0x7E00
+	DQ	1
 
 drvnum:
 	DB	0
+
+cluster:
+	DD	2
 
 stage0:
 	cli
@@ -128,14 +131,44 @@ stage1:
 	mov	al, 0xdd
 	out	0x64, al
 	
-	mov	eax, RESVD_SECTORS + FAT_SECTORS
-	call	loadsect
+	call	nxtclust
 	
-	call scandir
+	call	scandir
 	
-	jmp	halt
+	jc	.fail
+	
+	
+	mov	si, .ok
+	call	puts
+	
+	mov	ax, 0x1000
+.loop	
+	push	ax
+	xor	ax, ax
+	mov	es, ax
+	call	nxtclust
+	pop	ax
+	jc	.done
+	mov	es, ax
+	xor	di, di
+	mov	si, 0xc000
+	mov	cx, 512
+	rep movsb
+	
+	add	ax, 0x20
+	jmp	.loop
+	
+.done	mov	ax, 0x1000
+	mov	es, ax
+	mov	ds, ax
+	mov	fs, ax
+	mov	gs, ax
+	jmp	0x1000:0
+	
+.fail	jmp	halt
 
 .msg:	DB `stage1 bootloader loaded.\r\n`, 0
+.ok:	DB `Found kernel directory entry.\r\n`, 0
 
 loadsect: ; loads sector number eax at offset 0xc000
 	mov	[.lba], eax
@@ -152,6 +185,29 @@ loadsect: ; loads sector number eax at offset 0xc000
 	DD	0xc000
 .lba	DQ	0
 
+; the "cluster" variable tells us which cluster to load. First, we need to work
+; out what the next cluster index is
+nxtclust:
+	mov	eax, [cluster]
+	and	eax, 0x0fffffff
+	cmp	eax, 0x0ffffff8
+	jge	.eof
+	push	eax
+	shr	eax, 7
+	add	eax, RESVD_SECTORS
+	call	loadsect
+	pop	eax
+	mov	ebx, eax
+	and	ebx, 0x7F
+	shl	bx, 2
+	mov	ebx, [ebx+0xc000]
+	mov	[cluster], ebx
+	add	eax, RESVD_SECTORS + FAT_SECTORS - 2
+	call	loadsect
+	clc
+	ret
+.eof	stc
+	ret
 
 ; scan a FAT32 cluster at 0xc000 for the kernel.
 ; eax = kernel cluster on success
@@ -166,22 +222,17 @@ scandir:
 	add	bx, 32
 	cmp	bx, 0xe000
 	jl	.loop
-	xor	eax, eax
+	call	nxtclust
+	jnc	scandir
 	ret
 .success:
-	push	bx
-	mov	si, .msg
-	call	puts
-	pop	bx
 	mov	ax, [bx+20]
 	shl	eax, 16
 	mov	ax, [bx+26]
-	add	al, '0'
-	mov	ah, 0x0e
-	int	0x10
+	mov	[cluster], eax
+	clc
 	ret
 
-.msg:	DB `Found kernel directory entry.\r\n`, 0
 .fname:	DB "KERNEL  BIN"
 
 ; padding + FAT ;
