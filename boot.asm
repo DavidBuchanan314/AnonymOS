@@ -137,13 +137,11 @@ stage1:
 	
 	jc	.fail
 	
-	
 	mov	si, .ok
 	call	puts
 	
 	mov	ax, 0x1000
-.loop	
-	push	ax
+.loop	push	ax
 	xor	ax, ax
 	mov	es, ax
 	call	nxtclust
