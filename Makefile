@@ -1,6 +1,10 @@
+VPATH=kernel/:bootloader/:rootfs/
+
+.PHONY: all test
+
 all: boot.bin
 
-boot.bin: bootloader/boot.asm KERNEL.BIN
+boot.bin: boot.asm KERNEL.BIN
 	nasm -f bin -o boot.bin -l boot.lst bootloader/boot.asm
 	dd if=/dev/zero bs=127M count=1 >> boot.bin 2>/dev/null # padding
 	echo "Copying rootfs files to disk image. Root will be required for loopback mount."
@@ -13,7 +17,7 @@ boot.bin: bootloader/boot.asm KERNEL.BIN
 	cp -r rootfs/* mnt/
 	sudo umount mnt/
 
-KERNEL.BIN: kernel/kernel.asm rootfs
+KERNEL.BIN: kernel.asm rootfs
 	nasm -f bin -o rootfs/KERNEL.BIN kernel/kernel.asm
 
 rootfs:
