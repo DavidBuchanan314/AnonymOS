@@ -1,5 +1,5 @@
-	BITS 16
-	ORG 0x7c00
+	BITS	16
+	ORG	0x7c00
 
 ; constants ;
 
@@ -11,7 +11,7 @@
 
 ; jump to stage0 bootloader ;
 
-	jmp stage0
+	jmp	stage0
 	nop
 
 ; FAT32 Parameter Block ;
@@ -107,8 +107,8 @@ halt:
 	cli
 	hlt
 
-	TIMES 510-($-$$) DB 0
-	DW 0xAA55		; boot signature
+	TIMES	510-($-$$) DB 0
+	DW	0xAA55		; boot signature
 
 ; FSInfo sector ;
 
@@ -165,8 +165,8 @@ stage1:
 	
 .fail	jmp	halt
 
-.msg:	DB `stage1 bootloader loaded.\r\n`, 0
-.ok:	DB `Found kernel directory entry.\r\n`, 0
+.msg:	DB	`stage1 bootloader loaded.\r\n`, 0
+.ok:	DB	`Found kernel directory entry.\r\n`, 0
 
 loadsect: ; loads sector number eax at offset 0xc000
 	mov	[.lba], eax
@@ -231,15 +231,15 @@ scandir:
 	clc
 	ret
 
-.fname:	DB "KERNEL  BIN"
+.fname:	DB	"KERNEL  BIN"
 
 ; padding + FAT ;
 
 	TIMES RESVD_SECTORS*SECTOR_SIZE-($-$$) DB 0
-fat:	DD 0x0ffffff0
-	DD 0x0fffffff
-	DD 0x0fffffff
+fat:	DD	0x0ffffff0
+	DD	0x0fffffff
+	DD	0x0fffffff
 
 ; padding (rest of filesytem) ;
 
-	TIMES 0x100000-($-$$) DB 0 ; Only pad to 1MB, NASM is slow at padding :(
+	TIMES	0x100000-($-$$) DB 0 ; Only pad to 1MB, NASM is slow at padding :(
