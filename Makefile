@@ -1,7 +1,7 @@
 all: boot.bin
 
-boot.bin: boot.asm KERNEL.BIN
-	nasm -f bin -o boot.bin -l boot.lst boot.asm
+boot.bin: bootloader/boot.asm KERNEL.BIN
+	nasm -f bin -o boot.bin -l boot.lst bootloader/boot.asm
 	dd if=/dev/zero bs=127M count=1 >> boot.bin 2>/dev/null # padding
 	echo "Copying rootfs files to disk image. Root will be required for loopback mount."
 	mkdir -p mnt
@@ -13,8 +13,8 @@ boot.bin: boot.asm KERNEL.BIN
 	cp -r rootfs/* mnt/
 	sudo umount mnt/
 
-KERNEL.BIN: kernel.asm rootfs
-	nasm -f bin -o rootfs/KERNEL.BIN kernel.asm
+KERNEL.BIN: kernel/kernel.asm rootfs
+	nasm -f bin -o rootfs/KERNEL.BIN kernel/kernel.asm
 
 rootfs:
 	mkdir -p rootfs
