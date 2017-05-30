@@ -1,22 +1,34 @@
-	BITS	16
-	ORG	0x10000 ; will eventually be 32-bit
+	BITS	32
+	ORG	0x10000 ; Where the bootloader will load us
 
 start:
-	mov	si, msg
+	call	cls
+	
+	mov	ecx, msgend - msg
+	mov	esi, msg
 	call	puts
-	mov	si, test
-	call	puts
-	cli
-	hlt
+	
+	jmp	halt
 
-puts: ; string in si
-	mov	ah, 0x0e
-.loop	lodsb
-	or	al, al
-	jz	.done
-	int	0x10
-	jmp	.loop
-.done	ret
+cls: ; write a load of spaces to the screen text buffer
+	mov	edi, 0xB8000
+	mov	ecx, 80*25
+	mov	al, ' '
+.loop	stosb
+	inc	edi
+	loop	.loop
+	ret
 
-msg:	DB	`AnonymOS kernel loaded!!!\r\n`, 0
-test:	DB	"Testing really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really long strings (to make the kernel take up mutiple clusters on disk)", 0
+puts: ; very dumb print function
+	mov	edi, 0xB8000
+.loop	movsb
+	inc	edi
+	loop	.loop
+	ret
+
+halt:
+	jmp	halt
+
+msg:
+	DB	"Hello from the 32-bit kernel!"
+msgend:

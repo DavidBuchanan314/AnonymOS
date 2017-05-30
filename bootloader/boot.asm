@@ -156,12 +156,14 @@ stage1:
 	add	ax, 0x20
 	jmp	.loop
 	
-.done	mov	ax, 0x1000
-	mov	es, ax
-	mov	ds, ax
-	mov	fs, ax
-	mov	gs, ax
-	jmp	0x1000:0
+.done	cli
+	lgdt	[gdt_ptr]	; load the GDT register
+	
+	mov	eax, cr0 
+	or	al, 1		; Enabl the PE bit in the control register
+	mov	cr0, eax
+	
+	jmp	0x08:stage2	; 0x08 is the code selector
 	
 .fail	jmp	halt
 
@@ -232,6 +234,50 @@ scandir:
 	ret
 
 .fname:	DB	"KERNEL  BIN"
+
+
+; Global Descriptor Table ;
+
+gdt:
+; null entry
+	DD	0
+	DD	0
+; code descriptor
+	DW	0xFFFF		; limit low
+	DW	0		; base low
+	DB	0		; base middle
+	DB	10011010b	; access
+	DB	11001111b	; granularity
+	DB	0		; base high
+; data descriptor
+	DW	0xFFFF		; limit low
+	DW	0		; base low
+	DB	0		; base middle
+	DB	10010010b	; access
+	DB	11001111b	; granularity
+	DB	0		; base high
+gdt_end:
+
+gdt_ptr:
+	DW	gdt_end - gdt - 1
+	DD	gdt
+
+
+; stage2 bootloader code - Protected mode starts here;
+
+BITS 32
+
+stage2:
+	mov	ax, 0x10	; 0x10 is the data selector
+	mov	ds, ax
+	mov	es, ax
+	mov	fs, ax
+	mov	gs, ax
+	mov	ss, ax
+	
+	mov	esp, 0x7ffff	; where the old stack was
+	
+	jmp	0x10000		; Jump into the kernel!
 
 ; padding + FAT ;
 
