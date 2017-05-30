@@ -167,10 +167,13 @@ stage1:
 	
 	jmp	0x08:stage2	; 0x08 is the code selector
 	
-.fail	jmp	halt
+.fail	mov	si, .err
+	call	puts
+	jmp	halt
 
 .msg:	DB	`stage1 bootloader loaded.\r\n`, 0
 .ok:	DB	`Found kernel directory entry.\r\n`, 0
+.err:	DB	`FATAL: KERNEL.BIN not found\r\n`, 0
 
 loadsect: ; loads sector number eax at offset 0xc000
 	mov	[.lba], eax
