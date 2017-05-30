@@ -61,6 +61,8 @@ cluster:
 	DD	2
 
 stage0:
+	cld ; clear the direction flag, might be a good idea
+	
 	cli
 	xor	ax, ax ; zero all the things!
 	mov	ds, ax
