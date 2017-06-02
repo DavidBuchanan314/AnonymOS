@@ -314,7 +314,7 @@ stage2:
 	
 	mov	esp, 0x7FFFF	; where the old stack was
 	
-	fldcw	[0x37F] ; init the FPU
+	fldcw	[.fpucw] ; init the FPU
 	
 	push	DWORD [vesainfo+0x19] ; bits per pixel
 	push	DWORD [vesainfo+0x28] ; buffer address
@@ -323,6 +323,8 @@ stage2:
 	call	0x10000		; Jump into the kernel!
 	
 	jmp	halt ; this should probably never happen
+	
+.fpucw: DW	0x37F
 
 ; padding + FAT ;
 

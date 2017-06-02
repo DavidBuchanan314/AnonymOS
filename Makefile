@@ -21,7 +21,7 @@ boot.bin: boot.asm KERNEL.BIN
 #	nasm -f bin -o rootfs/KERNEL.BIN kernel/kernel.asm
 
 KERNEL.BIN: kernel.c rootfs
-	i686-elf-gcc -o rootfs/KERNEL.BIN kernel/kernel.c -ffreestanding -Ofast -nostdlib -Wl,--oformat=binary,-Ttext=0x10000
+	i686-elf-gcc -o rootfs/KERNEL.BIN kernel/kernel.c -ffreestanding -Ofast -nostdlib -Wl,--oformat=binary,-Ttext=0x10000 -Wall -Wextra -Wpedantic
 
 rootfs:
 	mkdir -p rootfs
