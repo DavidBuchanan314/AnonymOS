@@ -1,5 +1,5 @@
 	BITS	16
-	ORG	0x7c00
+	ORG	0x7C00
 
 ; constants ;
 
@@ -71,7 +71,7 @@ stage0:
 	mov	gs, ax
 	mov	ah, 0x70
 	mov	ss, ax
-	mov	sp, 0xffff ; set up a 64k stack from 0x7ffff down to 0x70000
+	mov	sp, 0xFFFF ; set up a 64k stack from 0x7ffff down to 0x70000
 	sti
 	
 	mov	[drvnum], dl ; Back up the drive number
@@ -97,7 +97,7 @@ diskerr:
 .error	DB `A disk read error occured.\r\n`, 0
 
 puts: ; string in si
-	mov	ah, 0x0e
+	mov	ah, 0x0E
 .loop	lodsb
 	or	al, al
 	jz	.done
@@ -120,7 +120,7 @@ halt:
 	FSI_Free_Count:	DD IMAGE_SECTORS - RESVD_SECTORS - FAT_SECTORS - 1
 	FSI_Nxt_Free:	DD 2
 	FSI_Reserved2:	TIMES 12 DB 0
-	FSI_TrailSig:	DD 0xaa550000
+	FSI_TrailSig:	DD 0xAA550000
 
 ; stage1 bootloader code ;
 
@@ -129,9 +129,10 @@ stage1:
 	mov	si, .msg
 	call	puts
 	
-	; enable A20 via keyboard controller
-	mov	al, 0xdd
-	out	0x64, al
+	; enable A20 via FAST A20
+	in	al, 0x92
+	or	al, 2
+	out	0x92, al
 	
 	call	nxtclust
 	
@@ -151,14 +152,16 @@ stage1:
 	jc	.done
 	mov	es, ax
 	xor	di, di
-	mov	si, 0xc000
+	mov	si, 0xC000
 	mov	cx, 512
 	rep movsb
 	
 	add	ax, 0x20
 	jmp	.loop
 	
-.done	cli
+.done	call vgainit
+	
+	cli
 	lgdt	[gdt_ptr]	; load the GDT register
 	
 	mov	eax, cr0 
@@ -183,11 +186,12 @@ loadsect: ; loads sector number eax at offset 0xc000
 	int	0x13
 	jc	diskerr
 	ret
+	
 	ALIGN	4 ; needed for following Disk Address Packet
 .pkt	DB	0x10
 	DB	0
 	DW	1
-	DD	0xc000
+	DD	0xC000
 .lba	DQ	0
 
 ; the "cluster" variable tells us which cluster to load. First, we need to work
@@ -211,6 +215,7 @@ nxtclust:
 	call	loadsect
 	clc
 	ret
+	
 .eof	stc
 	ret
 
@@ -218,14 +223,14 @@ nxtclust:
 ; eax = kernel cluster on success
 ; eax = 0 on failure
 scandir:
-	mov	bx, 0xc000
+	mov	bx, 0xC000
 .loop	mov	si, bx
 	mov	di, .fname
 	mov	cx, 11
 	repe cmpsb
 	je 	.success
 	add	bx, 32
-	cmp	bx, 0xe000
+	cmp	bx, 0xE000
 	jl	.loop
 	call	nxtclust
 	jnc	scandir
@@ -239,6 +244,33 @@ scandir:
 	ret
 
 .fname:	DB	"KERNEL  BIN"
+
+; setup VESA video mode
+vgainit:
+	mov	ax, 0x4F01
+	mov	cx, 0x11B ; 1280x1024x24
+	mov	di, vesainfo
+	int	0x10
+	cmp	ax, 0x004F
+	jne	.fail
+	mov	al, [vesainfo]
+	and	al, 0x80
+	je	.fail ; check that LFB is supported
+	mov	ax, 0x4F02
+	mov	bx, 0x411B ; 1280x1024x24, LFB enabled
+	int	0x10
+	cmp	ax, 0x004F
+	jne	.fail
+	ret
+	
+.fail	mov	si, .err
+	call	puts
+	jmp	halt
+
+.err:	DB	`FATAL: VESA mode not supported\r\n`, 0
+
+vesainfo:
+	TIMES 256 DB 0
 
 
 ; Global Descriptor Table ;
@@ -280,16 +312,22 @@ stage2:
 	mov	gs, ax
 	mov	ss, ax
 	
-	mov	esp, 0x7ffff	; where the old stack was
+	mov	esp, 0x7FFFF	; where the old stack was
 	
-	jmp	0x10000		; Jump into the kernel!
+	push	DWORD [vesainfo+0x19] ; bits per pixel
+	push	DWORD [vesainfo+0x28] ; buffer address
+	push	DWORD [vesainfo+0x32] ; bytes per line
+	
+	call	0x10000		; Jump into the kernel!
+	
+	jmp	halt ; this should probably never happen
 
 ; padding + FAT ;
 
 	TIMES RESVD_SECTORS*SECTOR_SIZE-($-$$) DB 0
-fat:	DD	0x0ffffff0
-	DD	0x0fffffff
-	DD	0x0fffffff
+fat:	DD	0x0FFFFFF0
+	DD	0x0FFFFFFF
+	DD	0x0FFFFFFF
 
 ; padding (rest of filesytem) ;
 
