@@ -314,6 +314,8 @@ stage2:
 	
 	mov	esp, 0x7FFFF	; where the old stack was
 	
+	fldcw	[0x37F] ; init the FPU
+	
 	push	DWORD [vesainfo+0x19] ; bits per pixel
 	push	DWORD [vesainfo+0x28] ; buffer address
 	push	DWORD [vesainfo+0x32] ; bytes per line
