@@ -302,7 +302,7 @@ gdt_ptr:
 
 ; stage2 bootloader code - Protected mode starts here;
 
-BITS 32
+	BITS	32
 
 stage2:
 	mov	ax, 0x10	; 0x10 is the data selector

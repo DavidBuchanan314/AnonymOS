@@ -12,10 +12,12 @@ Yet another unnamed operating system project. The OS itself does not offer anony
 ## Current Status
 
 - A bootable FAT32 disk image is generated.
-- the stage0 bootloader is capable of loading and executing the stage1 bootloader from the
-reserved sectors before the filesystem.
+- the bootloader is capable of loading and executing a 32-bit kernel (written in C). Currently, the loadable kernel
+size is limited by the 1MB memory barrier. The bootloader also sets up VESA graphics.
 
 ## Building
 
 Running `make` will generate a bootable FAT32 disk image called `boot.bin`. You can test
 this image in QEMU by running `make test`, or possibly by writing it to a USB drive.
+
+`i686-elf-gcc` is required to compile the kernel.
