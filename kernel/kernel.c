@@ -1,7 +1,7 @@
 #define COM1 0x3F8
 
 void _fake_start() { // The entry point needs to be at the start of the file
-	asm("jmp start");
+	asm("jmp _start");
 }
 
 static inline void outb(short port, char val) {
@@ -23,15 +23,13 @@ void puts_serial(char * str) {
 	while (*str) {
 		putc_serial(*str++);
 	}
-	putc_serial('\r');
 	putc_serial('\n');
 }
 
-void start(short bpl, unsigned char * vbuf, unsigned char bpp) {
+void _start(short bpl, unsigned char * vbuf, unsigned char bpp) {
 	bpp /= 8;
 	
-	char * hello = "Hello, serial port!";
-	puts_serial(hello);
+	puts_serial("Hello, serial port!");
 	
 	for (int y = 0; y < 1024; y++) {
 		for (int x = 0; x < 1280; x++) {
