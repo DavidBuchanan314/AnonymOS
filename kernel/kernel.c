@@ -1,12 +1,21 @@
 #include <stdarg.h>
 
 #define COM1 0x3F8
+#define FONT_WIDTH 8
+#define FONT_HEIGHT 14
+#define FONT_BMP_LEN (FONT_WIDTH * FONT_HEIGHT)
+#define WIDTH 1280
+#define HEIGHT 1024
 
 void _fake_start() { // The entry point needs to be at the start of the file
 	asm("jmp _start");
 }
 
 unsigned int rsvdsect;
+short bpl;
+unsigned char * vbuf;
+unsigned char bpp;
+unsigned char * font;
 
 static inline void outb(short port, unsigned char val) {
 	asm volatile ( "outb %0, %1" : : "a"(val), "Nd"(port) );
@@ -38,9 +47,9 @@ void puts_serial(const char * str) {
 }
 
 int memcmp(const void *s1, const void *s2, int n) {
-	const unsigned char *l = s1, *r = s2;
-	while (*l++ == *r++ && n--);
-	return *l - *r;
+	const unsigned char *l = s1, *r = s2; // borrowed from MUSL
+	for (; n && *l == *r; n--, l++, r++);
+	return n ? *l-*r : 0;
 }
 
 void memcpy(void *dest, const void *src, int n) {
@@ -51,7 +60,7 @@ void memcpy(void *dest, const void *src, int n) {
 	}
 }
 
-void printf_serial(char * fmt, ...) { // TODO: make robust
+void printf_generic(void (*putc_f)(char), char * fmt, ...) { // TODO: make robust
 	unsigned int arg;
 	char hexmap[] = "0123456789ABCDEF";
 	
@@ -64,26 +73,34 @@ void printf_serial(char * fmt, ...) { // TODO: make robust
 					case 'x':
 					case 'X':
 						arg = va_arg(args,int);
-						char buf[8];// = "000000000"; // This is really janky, for some reason having 8 0's causes the first to stay unchanged
+						char buf[8];
 						for (int i = 7; i >= 0; i--) {
 							buf[i] = hexmap[arg & 0xF];
 							arg >>= 4;
 						}
-						for (int i = 0; i < 8; i++) putc_serial(buf[i]);
+						for (int i = 0; i < 8; i++) (*putc_f)(buf[i]);
 						break;
 					case '%':
-						putc_serial('%');
+						(*putc_f)('%');
 						break;
 					default:
-						putc_serial('%');
-						putc_serial(*fmt);
+						(*putc_f)('%');
+						(*putc_f)(*fmt);
 				}
 				fmt++;
 				break;
 			default:
-				putc_serial(*fmt++);
+				(*putc_f)(*fmt++);
 		}
 	}
+	va_end(args);
+}
+
+void printf_serial(char * fmt, ...) {
+	return;
+	va_list args;
+	va_start(args, fmt);
+	printf_generic(putc_serial, fmt, args);
 	va_end(args);
 }
 
@@ -134,10 +151,11 @@ int load_file(void * dst, char * name) {
 		for (int i = 0; i < 512; i += 32) {
 			//puts_serial(&buf[i]);
 			if (memcmp(name, &buf[i], 11) == 0) {
+				//puts_serial("yep");
 				fileclust = * (unsigned short *) &buf[i + 20];
 				fileclust <<= 16;
 				fileclust |= * (unsigned short *) &buf[i + 26];
-				filelen = * (unsigned int *) &buf[i + 0x1C];
+				filelen = * (unsigned int *) &buf[i + 28];
 				break;
 				
 			}
@@ -156,7 +174,7 @@ int load_file(void * dst, char * name) {
 	printf_serial("File length: 0x%X\n", filelen);
 	
 	while (fileclust < 0x0ffffff8) {
-		printf_serial("File cluster: 0x%X\n", fileclust);
+		//printf_serial("File cluster: 0x%X\n", fileclust);
 		read_sector(&((char *)dst)[writei], rsvdsect + fatsize + fileclust - 2);
 		writei += 512;
 		fileclust = next_cluster(buf, fileclust);
@@ -172,23 +190,60 @@ int load_file(void * dst, char * name) {
 	return filelen;
 }
 
-void _start(short bpl, unsigned char * vbuf, unsigned char bpp) {
-	bpp /= 8;
+void kputc(char c) {
+	static unsigned int cx = 1, cy = 1;
+	
+	if (c == '\n') {
+		cx = 1;
+		cy++;
+		return;
+	}
+	
+	for (int fy = 0; fy < FONT_HEIGHT; fy++) {
+		for (int fx = 0; fx < FONT_WIDTH; fx++) {
+			if (font[c*FONT_BMP_LEN+fy*FONT_WIDTH+fx]) {
+				unsigned int offset = (fy+cy*FONT_HEIGHT)*bpl+(cx*FONT_WIDTH+fx)*bpp;
+				vbuf[offset] = 0xFF;
+				vbuf[offset+1] = 0xFF;
+				vbuf[offset+2] = 0xFF;
+				offset += bpl + bpp;
+				vbuf[offset] = 0; // inefficient shadow effect
+				vbuf[offset+1] = 0;
+				vbuf[offset+2] = 0;
+			}
+		}
+	}
+	cx++;
+	if ((cx+1)*FONT_WIDTH>= WIDTH) {
+		cx = 1;
+		cy++;
+	}
+}
+
+void kprintf(char * fmt, ...) {
+	return;
+	va_list args;
+	va_start(args, fmt);
+	printf_generic(kputc, fmt, args);
+	va_end(args);
+}
+
+void _start(short _bpl, unsigned char * _vbuf, unsigned char _bpp) {
+	bpp = _bpp / 8;
+	vbuf = _vbuf;
+	bpl = _bpl;
 	
 	char buf[512];
 	
-	//read_sector(buf, 0);
-	//puts_serial(&buf[3]);
+	puts_serial("Hello, world!");
+	
 	printf_serial("Framebuffer at 0x%X\n", vbuf);
 	
-	//load_file(buf, "HELLO   TXT");
-	//printf_serial(buf);
-	
-	char * splash = (void *) 0x400000;
-	load_file(splash, "SPLASH  PPM");
+	printf_serial("Loaded 0x%X bytes\n", load_file(buf, "HELLO   TXT"));
+	printf_serial(buf);
 	
 	// Render the mandelbrot set
-	/*for (int y = 0; y < 1024; y++) {
+	for (int y = 0; y < 1024; y++) {
 		for (int x = 0; x < 1280; x++) {
 			float x0 = ((float)x - 800) / 400;
 			float y0 = ((float)y - 512) / 400;
@@ -209,15 +264,29 @@ void _start(short bpl, unsigned char * vbuf, unsigned char bpp) {
 			vbuf[y*bpl+x*bpp+1] = i;
 			vbuf[y*bpl+x*bpp+2] = i;
 		}
-	}*/
+	}
 	
-	for (int y = 0; y < 1024; y++) {
-		for (int x = 0; x < 1280; x++) {
-			vbuf[y*bpl+x*bpp] = splash[17+y*1280*3+x*3+2];
-			vbuf[y*bpl+x*bpp+1] = splash[17+y*1280*3+x*3+1];
-			vbuf[y*bpl+x*bpp+2] = splash[17+y*1280*3+x*3];
+	char * splash = (void *) 0x400000;
+	load_file(splash, "SPLASH  PPM");
+	
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			vbuf[y*bpl+x*bpp] = splash[17+y*WIDTH*3+x*3+2];
+			vbuf[y*bpl+x*bpp+1] = splash[17+y*WIDTH*3+x*3+1];
+			vbuf[y*bpl+x*bpp+2] = splash[17+y*WIDTH*3+x*3];
 		}
 	}
+	
+	font = (void *) 0x800000;
+	load_file(font, "FONT    DAT");
+	
+	char * readme = (void *) 0x800000;
+	load_file(readme, "LIPSUM  TXT");
+	
+	char * tmp = readme;
+	while (*tmp) kputc(*tmp++);
+	
+	puts_serial(readme);
 	
 	return;
 }
