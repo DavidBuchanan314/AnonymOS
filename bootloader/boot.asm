@@ -320,7 +320,13 @@ stage2:
 	push	DWORD [vesainfo+0x28] ; buffer address
 	push	DWORD [vesainfo+0x32] ; bytes per line
 	
-	call	0x10000		; Jump into the kernel!
+	mov	edi, 0x10000
+	mov	eax, 0x1337D00D
+	mov	ecx, 0x100000 ; signature must be in first 1MB
+	repne	scasd
+	call	edi
+	
+	;call	0x10000		; Jump into the kernel!
 	
 	jmp	halt ; this should probably never happen
 	

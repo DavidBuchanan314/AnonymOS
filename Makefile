@@ -27,4 +27,4 @@ rootfs:
 	mkdir -p rootfs
 
 test: boot.bin
-	qemu-system-i386 -m 512M -drive format=raw,file=boot.bin -serial stdio 2>/dev/null
+	qemu-system-i386 -enable-kvm -m 512M -drive format=raw,file=boot.bin -serial stdio 2>/dev/null

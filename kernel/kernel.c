@@ -7,8 +7,8 @@
 #define WIDTH 1280
 #define HEIGHT 1024
 
-void _fake_start() { // The entry point needs to be at the start of the file
-	asm("jmp _start");
+volatile void _fake_start() { // The entry point needs to be at the start of the file
+	asm(".align 4\n.int 0x1337D00D\njmp _start");
 }
 
 unsigned int rsvdsect;
@@ -33,7 +33,7 @@ static inline short inw(short port) {
 	return ret;
 }
 
-void putc_serial(char c) {
+void putc_serial(const char c) {
 	while (!(inb(COM1 + 5) & 0x20));
 	outb(COM1, c);
 }
@@ -60,12 +60,10 @@ void memcpy(void *dest, const void *src, int n) {
 	}
 }
 
-void printf_generic(void (*putc_f)(char), char * fmt, ...) { // TODO: make robust
+void vprintf_generic(void (*putc_f)(const char), char * fmt, va_list args) { // TODO: make robust
 	unsigned int arg;
 	char hexmap[] = "0123456789ABCDEF";
 	
-	va_list args;
-	va_start(args, fmt);
 	while (*fmt) {
 		switch (*fmt) {
 			case '%':
@@ -93,14 +91,12 @@ void printf_generic(void (*putc_f)(char), char * fmt, ...) { // TODO: make robus
 				(*putc_f)(*fmt++);
 		}
 	}
-	va_end(args);
 }
 
 void printf_serial(char * fmt, ...) {
-	return;
 	va_list args;
 	va_start(args, fmt);
-	printf_generic(putc_serial, fmt, args);
+	vprintf_generic(putc_serial, fmt, args);
 	va_end(args);
 }
 
@@ -190,7 +186,7 @@ int load_file(void * dst, char * name) {
 	return filelen;
 }
 
-void kputc(char c) {
+void kputc(const char c) {
 	static unsigned int cx = 1, cy = 1;
 	
 	if (c == '\n') {
@@ -221,10 +217,10 @@ void kputc(char c) {
 }
 
 void kprintf(char * fmt, ...) {
-	return;
+	//return;
 	va_list args;
 	va_start(args, fmt);
-	printf_generic(kputc, fmt, args);
+	vprintf_generic(kputc, fmt, args);
 	va_end(args);
 }
 
@@ -266,7 +262,10 @@ void _start(short _bpl, unsigned char * _vbuf, unsigned char _bpp) {
 		}
 	}
 	
-	char * splash = (void *) 0x400000;
+	font = (void *) 0x800000;
+	load_file(font, "FONT    DAT");
+	
+	char * splash = (void *) vbuf;
 	load_file(splash, "SPLASH  PPM");
 	
 	for (int y = 0; y < HEIGHT; y++) {
@@ -277,16 +276,14 @@ void _start(short _bpl, unsigned char * _vbuf, unsigned char _bpp) {
 		}
 	}
 	
-	font = (void *) 0x800000;
-	load_file(font, "FONT    DAT");
+	kprintf("AnonymOS kernel v0.0.1\n\n");
+	kprintf("Framebuffer at 0x%X\n", vbuf);
 	
-	char * readme = (void *) 0x800000;
+	/*char * readme = (void *) 0x900000;
 	load_file(readme, "LIPSUM  TXT");
 	
 	char * tmp = readme;
-	while (*tmp) kputc(*tmp++);
-	
-	puts_serial(readme);
+	while (*tmp) kputc(*tmp++);*/
 	
 	return;
 }
