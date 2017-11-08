@@ -2,6 +2,8 @@
 Yet another unnamed operating system project. The OS itself does not offer anonymity
 (or any other useful features), I simply couldn't think of a name.
 
+![AnonymOS Screenshot](https://github.com/DavidBuchanan314/AnonymOS/raw/master/misc/screenshot.png)
+
 ## Goals
 
 - The multi-stage bootloader will capable of loading a 32-bit kernel in protected mode from a FAT32 filesystem.
