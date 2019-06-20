@@ -265,6 +265,7 @@ void _start(short _bpl, unsigned char * _vbuf, unsigned char _bpp) {
 	font = (void *) 0x800000;
 	load_file(font, "FONT    DAT");
 	
+	/* I have no idea why I decided to read the raw file into the framebuffer */
 	char * splash = (void *) vbuf;
 	load_file(splash, "SPLASH  PPM");
 	
